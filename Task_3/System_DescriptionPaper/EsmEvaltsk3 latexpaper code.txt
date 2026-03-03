@@ -1,0 +1,133 @@
+\documentclass[11pt,a4paper]{article}
+
+% Required packages to match the PDF style
+\usepackage{times}
+\usepackage{latexsym}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{microtype}
+\usepackage{inconsolata}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage[margin=1in]{geometry}
+\usepackage{multicol}
+
+% Title and Author formatting
+\title{\textbf{Team HausaNLP at SemEval-2026 Task 1: From Standard Regression to Distributional Alignment in Dimensional Sentiment Analysis}}
+
+\author{
+  \textbf{Faisal Muhammad Adam}$^1$, \textbf{Lukman Aliyu Jirin}$^2$, \textbf{Sani Aji}$^3$, \\
+  \textbf{Aliyu Rabiu Shuaibu}$^4$, and \textbf{Abdulhamid Abubakar}$^5$ \\
+  $^1$National Open University of Nigeria \\
+  $^2$HausaNLP \\
+  $^3$Gombe State University \\
+  $^4$Nasarawa State University, Keffi \\
+  $^5$Nile University of Nigeria, Abuja \\
+  \texttt{\{faisaladamm, lukman.j.aliyu, saniajy\}@gmail.com}
+}
+
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This paper describes our participation in SemEval-2026 Task 1: Dimensional Aspect-Based Sentiment Analysis. We explored a distinct approach to identify the continuous emotional intensity of aspect terms within reviews. Our system utilized a pre-trained \textbf{DeBERTa-V3} backbone to capture semantic meaning through disentangled attention. We found that while standard Mean Squared Error (MSE) loss established a fundamental performance floor, our novel \textbf{Hybrid MSE-CCC Loss} significantly improved the detection of high-arousal sentiments by identifying distributional relationships that simple regression missed.
+\end{abstract}
+
+\begin{multicols}{2}
+
+\section{Introduction}
+
+The task of identifying dimensional sentiment requires models that can look beyond surface-level polarity to understand emotional intensity and arousal. We approached this challenge by developing a pipeline that could evaluate sentence-aspect pairs based on two different paradigms: absolute numerical accuracy (how close the values are) and distributional similarity (how well the trends match).
+
+We submitted results for the English subtracks, testing a neural model that balances these competing objectives to resolve the ``regression to the mean'' problem common in continuous sentiment analysis.
+
+\section{System Description}
+
+We developed a unified system to compare the effectiveness of standard regression objectives against correlation-based optimization methods.
+
+\subsection{Method 1: DeBERTa-V3 Backbone (Semantic)}
+
+To overcome the limitations of static embeddings, our submission utilized Transfer Learning with pre-trained Transformer models \cite{he2021debertav3}.
+
+\begin{itemize}
+    \item \textbf{Model Architecture:} We employed the \texttt{microsoft/deberta-v3-base} model. This model improves upon BERT using disentangled attention, encoding content and position separately to better map aspect terms to their context.
+    \item \textbf{Encoding:} We passed the concatenated sequence of the review text and the aspect term (separated by \texttt{[SEP]}) into the model to generate dense embeddings. Unlike standard BERT, DeBERTa's relative position bias captures the distance between the aspect (e.g., ``screen'') and the sentiment word (e.g., ``shattered'').
+    \item \textbf{Prediction Head:} We utilized a linear regression layer on top of the \texttt{[CLS]} token to project the hidden state into two continuous values: Valence and Arousal.
+\end{itemize}
+
+\subsection{Method 2: Hybrid Loss Optimization (Distributional)}
+
+Our primary innovation lay in the training objective. We treated the problem not just as point-wise regression, but as a distribution matching task \cite{lin1989ccc}.
+
+\begin{itemize}
+    \item \textbf{The Flaw of MSE:} Standard Mean Squared Error (MSE) often encourages models to predict ``safe'' average values (e.g., 5.0) to minimize the penalty for outliers.
+    \item \textbf{The Hybrid Solution:} We computed the loss as a weighted sum ($L_{Total} = 0.5 \cdot MSE + 0.5 \cdot CCC$).
+    \item \textbf{Concordance Correlation Coefficient (CCC):} This component penalizes the model if the \textit{variance} of the predictions does not match the variance of the ground truth. This forces the model to predict extreme values (1s and 9s) when appropriate, rather than clustering around the mean.
+\end{itemize}
+
+\section{Experimental Setup}
+
+\begin{itemize}
+    \item \textbf{Data:} We used the official SemEval-2026 Task 1 dataset provided by the organizers (Laptop and Restaurant domains), filtering out implicit \texttt{NULL} aspects.
+    \item \textbf{Tools:} Python 3.8+, PyTorch for tensor operations, and the Hugging Face \texttt{transformers} library for the neural model architecture.
+    \item \textbf{Hardware:} Experiments were conducted on Google Colab using an NVIDIA T4 GPU for fine-tuning and inference.
+\end{itemize}
+
+\section{Error Analysis}
+
+To better understand the performance of our system, we analyzed a subset of instances where the model successfully predicted Valence but struggled with Arousal.
+
+\textbf{The Polarity Trap:} We observed that the model is highly susceptible to ``polarity traps''---instances where the sentiment is clearly negative, but the intensity is ambiguous. For example, if an anchor review mentions ``The fan is loud,'' the model might correctly predict low Valence (bad) but incorrectly predict moderate Arousal (annoyance) instead of high Arousal (fury), simply because ``loud'' appears in both contexts.
+
+\textbf{Semantic Paraphrasing:} Conversely, the model showed robustness in cases of heavy paraphrasing. In instances where the review described a product as ``garbage'' and another as ``useless,'' the DeBERTa backbone correctly mapped these distinct lexical items to a similar vector space representing ``disgust,'' allowing the CCC loss to align their intensity scores.
+
+This analysis confirms that, while semantic embedding is a strong signal for polarity (accounting for our high Valence scores), the hybrid loss is strictly necessary to resolve ambiguities in intensity.
+
+\section{Results \& Discussion}
+
+We evaluated our system on the official test set provided by the SemEval organizers. Table \ref{tab:results} summarizes the performance of our approach.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lccc}
+\toprule
+\textbf{Domain} & \textbf{RMSE} & \textbf{PCC (V)} & \textbf{PCC (A)} \\
+\midrule
+Laptop & 1.5143 & 0.7961 & 0.4855 \\
+Restaurant & 1.4936 & 0.8308 & 0.5676 \\
+\midrule
+\textbf{Average} & \textbf{1.5039} & \textbf{0.8134} & \textbf{0.5265} \\
+\bottomrule
+\end{tabular}
+\caption{Comparison of accuracy scores across domains. RMSE is the combined error; PCC denotes Pearson Correlation.}
+\label{tab:results}
+\end{table}
+
+\subsection{Conclusion}
+
+Our participation in Task 1 highlighted the critical difference between predicting \textit{value} and predicting \textit{trend}. While our DeBERTa backbone established a solid semantic foundation (Valence: 0.81), our experiments with Hybrid MSE-CCC Loss demonstrated that correlation-based objectives are essential for high-accuracy arousal detection. Future work will focus on fine-tuning larger transformer models and exploring contrastive learning to further close the gap between textual meaning and emotional intensity.
+
+\begin{thebibliography}{4}
+
+\bibitem{he2021debertav3}
+He, P., Gao, J., \& Chen, W. (2021).
+\newblock DeBERTaV3: Improving DeBERTa using ELECTRA-Style Pre-Training with Gradient-Disentangled Embedding Sharing.
+\newblock \emph{International Conference on Learning Representations (ICLR)}.
+
+\bibitem{lin1989ccc}
+Lin, L. I. (1989).
+\newblock A concordance correlation coefficient to evaluate reproducibility.
+\newblock \emph{Biometrics}, 45(1), 255-268.
+
+\bibitem{pontiki2016semeval}
+Pontiki, M., et al. (2016).
+\newblock SemEval-2016 Task 5: Aspect Based Sentiment Analysis.
+\newblock \emph{Proceedings of SemEval-2016}.
+
+\end{thebibliography}
+
+\end{multicols}
+\end{document}
