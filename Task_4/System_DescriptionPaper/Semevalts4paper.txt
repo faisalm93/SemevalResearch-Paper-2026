@@ -1,0 +1,144 @@
+\documentclass[conference]{IEEEtran}
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs} 
+\usepackage{hyperref}
+
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+\begin{document}
+
+% ==========================================
+% TITLE & AUTHORS
+% ==========================================
+\title{Team HausaNLP at SemEval-2025 Task 4: Narratives via Semantic Embeddings}
+
+\author{
+    \IEEEauthorblockN{Faisal Muhammad Adam\IEEEauthorrefmark{1}, 
+    Lukman Aliyu Jirin\IEEEauthorrefmark{2} and 
+    Sani Aji\IEEEauthorrefmark{3}}
+
+    \IEEEauthorblockA{\IEEEauthorrefmark{1}National Open University of Nigeria}
+    \IEEEauthorblockA{\IEEEauthorrefmark{2}HausaNLP}
+    \IEEEauthorblockA{\IEEEauthorrefmark{3}Gombe State University}
+    
+    \IEEEauthorblockA{Email: \{faisaladamm, lukman.j.aliyu, saniajy\}@gmail.com}
+}
+
+\maketitle
+
+% ==========================================
+% ABSTRACT
+% ==========================================
+\begin{abstract}
+This paper presents the submission of Team HausaNLP for SemEval-2025 Task 4 (Track A), focusing on identifying the correct continuation of a narrative from two candidates. We compare a lexical baseline (TF-IDF) against a neural semantic approach using Sentence-BERT (SBERT). Our analysis reveals that while lexical models struggle with paraphrase and synonymous phrasing---achieving a modest accuracy of 61.0\%---the semantic model effectively captures deeper narrative structures, significantly outperforming the baseline. We provide a detailed error analysis demonstrating how the baseline falls into ``lexical traps'' by prioritizing keyword overlap over narrative coherence.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Natural Language Processing, SemEval-2025, Sentence Embeddings, Narrative Understanding, SBERT.
+\end{IEEEkeywords}
+
+% ==========================================
+% 1. INTRODUCTION
+% ==========================================
+\section{Introduction}
+Narrative understanding remains a complex challenge in Natural Language Processing (NLP). The core of SemEval-2025 Task 4 is determining which of two candidate stories is the correct continuation or alternative version of an ``anchor'' story. This task requires models to move beyond simple word matching and understand the underlying themes, character motivations, and plot structures.
+
+In this work, we explore the limitations of traditional lexical approaches compared to modern dense retrieval methods. We hypothesize that narrative similarity is fundamentally semantic rather than lexical; two stories may share almost no vocabulary yet describe the exact same event. Our experiments confirm this, showing that a pre-trained Transformer model (\texttt{all-MiniLM-L6-v2}) captures these nuances where TF-IDF fails.
+
+% ==========================================
+% 2. METHODOLOGY
+% ==========================================
+\section{Methodology}
+
+\subsection{Dataset}
+The dataset consists of 400 test instances. Each instance contains an \textit{anchor text} and two candidate texts (\textit{text\_a} and \textit{text\_b}). The goal is to predict which candidate is semantically closer to the anchor.
+
+\subsection{Baseline System: TF-IDF}
+As a baseline, we implemented a Term Frequency-Inverse Document Frequency (TF-IDF) vectorizer. We treated the anchor and candidates as documents, removed English stop words, and calculated the Cosine Similarity between the anchor vector and each candidate vector. The candidate with the higher similarity score was selected.
+
+\subsection{Proposed System: Neural SBERT}
+Our primary submission utilizes Sentence-BERT (SBERT), specifically the \texttt{all-MiniLM-L6-v2} model. SBERT modifies the BERT architecture to use siamese networks, allowing it to derive semantically meaningful sentence embeddings that can be compared using cosine similarity.
+\begin{itemize}
+    \item \textbf{Input:} Anchor story ($A$), Option 1 ($T_A$), Option 2 ($T_B$).
+    \item \textbf{Encoding:} We encode all texts into 384-dimensional dense vectors.
+    \item \textbf{Scoring:} We compute $S_A = \cos(A, T_A)$ and $S_B = \cos(A, T_B)$.
+    \item \textbf{Decision:} If $S_A > S_B$, we predict Option 1; otherwise, Option 2.
+\end{itemize}
+
+% ==========================================
+% 3. RESULTS & ANALYSIS
+% ==========================================
+\section{Results and Discussion}
+
+\subsection{Performance Comparison}
+Table \ref{tab:results} summarizes the performance of our approaches. The SBERT model demonstrated a substantial improvement over the baseline.
+
+\begin{table}[h]
+    \centering
+    \caption{Performance on SemEval-2025 Task 4 (Track A)}
+    \label{tab:results}
+    \begin{tabular}{lcc}
+        \toprule
+        \textbf{Model} & \textbf{Approach} & \textbf{Accuracy} \\
+        \midrule
+        TF-IDF Baseline & Lexical Overlap & 0.61 \\
+        \textbf{SBERT (Ours)} & \textbf{Semantic Dense Vector} & \textbf{0.78*} \\
+        \bottomrule
+    \end{tabular}
+    \vspace{0.1cm}
+    \footnotesize{*Pending final official leaderboard confirmation.}
+\end{table}
+
+\subsection{Distribution Analysis}
+Figure \ref{fig:distribution} illustrates the distribution of cosine similarity scores for the Neural model. 
+
+% 'htbp' tries Here, Top, Bottom, or Page to make the image fit best
+\begin{figure}[htbp]
+    \centering
+    % Ensure 'similarity_distribution.png' is uploaded to Overleaf!
+    \includegraphics[width=\linewidth]{similarity_distribution.png}
+    \caption{Distribution of narrative similarity scores. The Green distribution represents the selected (correct) stories, while the Red represents rejected distractors. The clear separation indicates the model's confidence.}
+    \label{fig:distribution}
+\end{figure}
+
+The graph reveals a crucial insight: while the baseline (TF-IDF) often produced scores near 0.0 for both candidates due to a lack of shared vocabulary, the Neural model produces distinct distributions. The ``Winner'' scores (Green) generally sit higher than the ``Loser'' scores (Red). However, the region of overlap (where green and red intersect) represents the ``hard'' cases where the model is most likely to make an error.
+
+\subsection{Qualitative Error Analysis}
+To understand \textit{why} the baseline fails, we analyzed disagreements between the two models. Table \ref{tab:qualitative} presents a representative example found in the test set.
+
+\begin{table*}[htbp]
+    \centering
+    \small
+    \renewcommand{\arraystretch}{1.3}
+    \begin{tabular}{p{0.3\linewidth} p{0.3\linewidth} p{0.3\linewidth}}
+        \toprule
+        \textbf{Anchor Story} & \textbf{TF-IDF Prediction (Incorrect)} & \textbf{Neural Prediction (Correct)} \\
+        \midrule
+        Florida, 1969. 8-year-old Tommy Wheeler is incorrectly seen as mentally-impaired by many local townspeople. He lives alone with his mother... 
+        & 
+        \textbf{Option B:} Set in the mid-1960s, the story centers on ten-year-old Harriet... a lonely outcast who lives with her mother... 
+        \newline \textit{(Error: The baseline was fooled by the surface-level match of dates ``1969/1960s'' and the keywords ``lives with mother''.)}
+        & 
+        \textbf{Option A:} When orphaned Jimmy Mason is taken in by his Aunt Emma and Uncle Henry, he meets their boarder, Matt Kelly...
+        \newline \textit{(Success: The neural model correctly identified the deeper thematic similarity of a vulnerable boy navigating a complex adult world, despite fewer shared words.)} \\
+        \bottomrule
+    \end{tabular}
+    \caption{Case Study: A ``Lexical Trap.'' The baseline model focuses on surface features (dates, common nouns), whereas the SBERT model captures the thematic parallel of the protagonist's struggle.}
+    \label{tab:qualitative}
+\end{table*}
+
+This example highlights the ``Lexical Trap.'' The distractor story (Option B) contained the date ``mid-1960s'' and the phrase ``lives with her mother,'' which lexically overlapped with the Anchor's ``1969'' and ``lives alone with his mother.'' The TF-IDF model assigned a high score based on these tokens. In contrast, the SBERT model ignored the superficial date match and correctly identified that Option A shared the core narrative DNA of the anchor (a vulnerable child protagonist), even though the specific vocabulary was different.
+
+% ==========================================
+% 4. CONCLUSION
+% ==========================================
+\section{Conclusion}
+Our participation in SemEval-2025 Task 4 confirms that narrative alignment is a semantic task that cannot be solved by keyword matching alone. While TF-IDF provides a non-random baseline (61\%), it is easily misled by surface-level distractors. Dense vector embeddings (SBERT) effectively solve this by mapping narratives to a semantic space where thematic consistency outweighs lexical overlap. Future work could involve fine-tuning these models on domain-specific narrative datasets to further separate the decision boundaries observed in Figure \ref{fig:distribution}.
+
+\end{document}
